@@ -56,6 +56,7 @@ zip-safe = false
 
 [tool.setuptools.package-data]
 kimodo = ["assets/**/*"]
+motion_correction = ["simde-license.txt"]
 
 [tool.flake8]
 max-line-length = 120

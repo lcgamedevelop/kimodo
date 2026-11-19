@@ -113,6 +113,7 @@ def load_model(
     return_resolved_name: bool = False,
     text_encoder=None,
     text_encoder_fp32: bool = False,
+    load_text_encoder: bool = True,
 ):
     """Load a kimodo model by name (e.g. 'g1', 'soma').
 
@@ -134,6 +135,7 @@ def load_model(
         text_encoder: Pre-built text encoder to reuse. When provided, skips
             text encoder selection/instantiation entirely.
         text_encoder_fp32: If True, uses fp32 for the text encoder rather than default bfloat16.
+        load_text_encoder: Set False to generate from pose constraints and empty prompts.
 
     Returns:
         Loaded model in eval mode, or (model, resolved short key) if
@@ -184,7 +186,7 @@ def load_model(
         # Same process at the moment for TMR and Kimodo
         pass
 
-    if text_encoder is not None:
+    if text_encoder is not None or not load_text_encoder:
         runtime_conf = OmegaConf.create({"checkpoint_dir": str(model_path)})
     else:
         text_encoder_url = get_env_var("TEXT_ENCODER_URL", DEFAULT_TEXT_ENCODER_URL)
@@ -198,7 +200,7 @@ def load_model(
     model_cfg = OmegaConf.to_container(OmegaConf.merge(model_conf, runtime_conf), resolve=True)
     model_cfg.pop("checkpoint_dir", None)
 
-    if text_encoder is not None:
+    if text_encoder is not None or not load_text_encoder:
         # Prevent Hydra from instantiating a new text encoder; pass None so
         # Kimodo.__init__ receives a placeholder we replace immediately after.
         model_cfg["text_encoder"] = None

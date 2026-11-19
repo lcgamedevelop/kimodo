@@ -5,7 +5,7 @@
 > Note: This repo was developed and primarily tested on Linux
 
 There are two ways to install Kimodo: (1) as a package, or (2) download the source code and install.
-Both require setting up a Hugging Face token to use the text encoder at generation time.
+Text-driven generation requires a Hugging Face token for the text encoder. Pose-only generation uses the motion checkpoint without loading the text encoder.
 
 ## Set Up Hugging Face Token
 
@@ -59,6 +59,21 @@ cd kimodo
 
 ### Choose Your Installation Route
 Kimodo can be installed by building and running through a virtual environment (e.g., `conda`) or within a Docker container.
+
+### Apple Silicon
+
+Install the Xcode command-line tools, CMake, and an arm64 Python with a Metal-enabled PyTorch build. With the environment active, run `pip install -e .` from the checkout. The motion correction build uses [SIMDe v0.8.2](https://github.com/simd-everywhere/simde/tree/71fd833d9666141edcd1d3c109a80e228303d8d7) on arm64.
+
+The generation CLI selects Apple Metal when MPS is available. Pass `--device cpu` to use the CPU, or set `KIMODO_DEVICE` for a default for the CLI and interactive demo. Device arguments to the CLI take precedence.
+
+Saved pose constraints can drive local generation directly:
+
+```sh
+kimodo_gen --pose-only --constraints constraints.json --device mps \
+    --model Kimodo-SOMA-RP-v1.2 --duration 0.6 --bvh --output transition
+```
+
+Pose-only generation loads the motion checkpoint and uses the model's empty text condition. Text-driven generation uses the text encoder described above.
 
 ```{toctree}
 :maxdepth: 1
