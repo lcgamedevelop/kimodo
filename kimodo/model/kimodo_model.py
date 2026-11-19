@@ -28,7 +28,7 @@ class Kimodo(nn.Module):
     def __init__(
         self,
         denoiser: nn.Module,
-        text_encoder: nn.Module,
+        text_encoder: Optional[nn.Module],
         num_base_steps: int,
         device: Optional[Union[str, torch.device]] = None,
         cfg_type: Optional[str] = "separated",
@@ -53,8 +53,8 @@ class Kimodo(nn.Module):
         self.text_encoder = text_encoder
 
         self.device = device
-        # for classifier-free guidance
-
+        if device is not None and torch.device(device).type == "mps":
+            self.float()
         self.to(device)
 
     @property
@@ -584,19 +584,24 @@ class Kimodo(nn.Module):
         device = self.device
         if text_feat is None:
             assert text_pad_mask is None
-            log.info("Encoding text...")
-            text_feat, text_length = self.text_encoder(texts)
-            text_feat = text_feat.to(device)
+            if self.text_encoder is None:
+                if any(text.strip() for text in texts):
+                    raise ValueError("A text encoder is required for non-empty prompts")
+                text_dims = self.denoiser.model.root_model.embed_text.in_features
+                text_feat = torch.zeros((len(texts), 1, text_dims), device=device)
+                text_pad_mask = torch.zeros((len(texts), 1), dtype=torch.bool, device=device)
+            else:
+                log.info("Encoding text...")
+                text_feat, text_length = self.text_encoder(texts)
+                text_feat = text_feat.to(device)
 
-            # handle empty string (set to zero)
-            empty_text_mask = [len(text.strip()) == 0 for text in texts]
-            text_feat[empty_text_mask] = 0
+                empty_text_mask = [not text.strip() for text in texts]
+                text_feat[empty_text_mask] = 0
 
-            # Create the pad mask for the text
-            batch_size, maxlen = text_feat.shape[:2]
-            tensor_text_length = torch.tensor(text_length, device=device)
-            tensor_text_length[empty_text_mask] = 0
-            text_pad_mask = torch.arange(maxlen, device=device).expand(batch_size, maxlen) < tensor_text_length[:, None]
+                batch_size, maxlen = text_feat.shape[:2]
+                tensor_text_length = torch.tensor(text_length, device=device)
+                tensor_text_length[empty_text_mask] = 0
+                text_pad_mask = torch.arange(maxlen, device=device).expand(batch_size, maxlen) < tensor_text_length[:, None]
 
         if motion_mask is not None:
             if motion_mask.dtype == torch.bool:

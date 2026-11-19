@@ -71,12 +71,28 @@ target_compile_definitions(motion_correction_cpp_base PUBLIC EIGEN_MPL2_ONLY)
 
 # Compiler-specific settings
 if(MSVC)
-    # MSVC-specific flags
-    target_compile_options(motion_correction_cpp_base PRIVATE /W4 /arch:AVX)
+    target_compile_options(motion_correction_cpp_base PRIVATE /W4)
 else()
-    # GCC/Clang flags (also applies to MinGW on Windows)
-    # Enable SSE4.1 and AVX instructions for SIMD operations
-    target_compile_options(motion_correction_cpp_base PRIVATE -Wall -Wextra -msse4.1 -mavx)
+    target_compile_options(motion_correction_cpp_base PRIVATE -Wall -Wextra)
+endif()
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|i[3-6]86|x86)$")
+    if(MSVC)
+        target_compile_options(motion_correction_cpp_base PRIVATE /arch:AVX)
+    else()
+        target_compile_options(motion_correction_cpp_base PRIVATE -msse4.1 -mavx)
+    endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
+    include(FetchContent)
+    FetchContent_Declare(
+        simde
+        GIT_REPOSITORY https://github.com/simd-everywhere/simde.git
+        GIT_TAG 71fd833d9666141edcd1d3c109a80e228303d8d7
+        SOURCE_SUBDIR simde
+    )
+    FetchContent_MakeAvailable(simde)
+    target_include_directories(motion_correction_cpp_base SYSTEM PUBLIC ${simde_SOURCE_DIR})
+    target_compile_definitions(motion_correction_cpp_base PUBLIC SIMDE_ENABLE_NATIVE_ALIASES)
 endif()
 
 # Python bindings
@@ -93,3 +109,4 @@ target_include_directories(_motion_correction PRIVATE
 install(TARGETS _motion_correction LIBRARY DESTINATION python/motion_correction)
 install(FILES python/motion_correction/__init__.py DESTINATION python/motion_correction)
 install(FILES python/motion_correction/motion_postprocess.py DESTINATION python/motion_correction)
+install(FILES python/motion_correction/simde-license.txt DESTINATION python/motion_correction)

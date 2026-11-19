@@ -10,6 +10,7 @@ import torch
 
 from kimodo import DEFAULT_MODEL, load_model
 from kimodo.constraints import load_constraints_lst
+from kimodo.device import select_device
 from kimodo.exports.motion_io import save_kimodo_npz
 from kimodo.meta import load_prompts_from_meta
 from kimodo.model.cfg import CFG_TYPES
@@ -61,6 +62,12 @@ def parse_args():
         type=str,
         default=None,
         help="Saved constraint list",
+    )
+    parser.add_argument("--device", metavar="DEVICE", help="Inference device (auto, cpu, mps, or cuda[:index]).")
+    parser.add_argument(
+        "--pose-only",
+        action="store_true",
+        help="Generate from a saved constraint list without a text encoder.",
     )
     parser.add_argument(
         "--output",
@@ -125,7 +132,10 @@ def parse_args():
             "Omit with --cfg_type nocfg. If omitted, two floats alone imply separated; one float alone implies regular."
         ),
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.pose_only and (not args.constraints or args.prompt or args.input_folder):
+        parser.error("--pose-only requires --constraints and no prompt or --input_folder")
+    return args
 
 
 def get_texts_and_num_frames_from_prompt(prompt: str, duration: str, fps: float):
@@ -239,9 +249,12 @@ def resolve_cfg_kwargs(args: argparse.Namespace, meta: Optional[Dict[str, Any]])
 def get_generation_inputs(args, fps: float):
     """Get texts/num_frames and parameter overrides from either CLI or input_folder."""
     if args.input_folder is None:
-        if not args.prompt:
+        if args.pose_only:
+            texts, num_frames = [""], [int(float(args.duration) * fps)]
+        elif args.prompt:
+            texts, num_frames = get_texts_and_num_frames_from_prompt(args.prompt, args.duration, fps)
+        else:
             raise ValueError("Either provide 'prompt' or '--input_folder'.")
-        texts, num_frames = get_texts_and_num_frames_from_prompt(args.prompt, args.duration, fps)
         return {
             "texts": texts,
             "num_frames": num_frames,
@@ -274,10 +287,9 @@ def get_generation_inputs(args, fps: float):
 
 
 def main():
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
-
     args = parse_args()
+    device = select_device(args.device)
+    print(f"Using device: {device}")
 
     # Load model (resolution of name done inside load_model)
     model, resolved_model = load_model(
@@ -285,6 +297,7 @@ def main():
         device=device,
         default_family="Kimodo",
         return_resolved_name=True,
+        load_text_encoder=not args.pose_only,
     )
     info = get_model_info(resolved_model)
     display = info.display_name if info else resolved_model

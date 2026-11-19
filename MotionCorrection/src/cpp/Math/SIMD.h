@@ -6,7 +6,12 @@
 #pragma once
 
 #include <stdint.h>
+#if defined(SIMDE_ENABLE_NATIVE_ALIASES)
+#include <simde/x86/avx.h>
+#include <simde/x86/sse4.1.h>
+#else
 #include <immintrin.h>
+#endif
 
 namespace SIMD
 {

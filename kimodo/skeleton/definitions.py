@@ -240,7 +240,10 @@ class SOMASkeleton30(SkeletonBase):
     def somaskel77(self):
         # lazy loading
         if not hasattr(self, "_somaskel77"):
-            self._somaskel77 = SOMASkeleton77()
+            dtype = self.neutral_joints.dtype if hasattr(self, "neutral_joints") else None
+            self._somaskel77 = SOMASkeleton77().to(
+                device=self.joint_parents.device, dtype=dtype
+            )
         return self._somaskel77
 
     @ensure_batched(local_joint_rots_subset=4)
